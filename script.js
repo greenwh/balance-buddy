@@ -513,7 +513,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const categoryInput = document.createElement('input');
                 categoryInput.type = 'text';
                 categoryInput.value = tx.category;
-                categoryInput.list = 'category-list';
+                categoryInput.setAttribute('list', 'category-list');
                 categoryInput.className = 'inline-category-edit';
                 categoryInput.style.fontSize = '0.85em';
                 categoryInput.style.fontStyle = 'italic';
@@ -522,11 +522,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 categoryInput.style.padding = '2px 4px';
                 categoryInput.style.width = '100%';
                 categoryInput.style.boxSizing = 'border-box';
+                categoryInput.style.cursor = 'text';
+                categoryInput.placeholder = 'Click to edit category';
                 
                 // Highlight on focus
                 categoryInput.onfocus = function() {
                     this.style.border = '1px solid #9370DB';
                     this.style.background = '#F5F5FF';
+                    this.select(); // Select text for easy replacement
                 };
                 
                 // Save on blur or enter
@@ -536,12 +539,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     const newCategory = categoryInput.value.trim();
                     if (newCategory && newCategory !== tx.category) {
                         updateTransactionCategory(tx.id, newCategory);
+                    } else if (!newCategory) {
+                        categoryInput.value = tx.category; // Restore if empty
                     }
                 };
                 
                 categoryInput.onblur = saveCategory;
                 categoryInput.onkeydown = function(e) {
                     if (e.key === 'Enter') {
+                        e.preventDefault();
                         this.blur();
                     } else if (e.key === 'Escape') {
                         categoryInput.value = tx.category;
@@ -926,6 +932,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const descriptionList = document.getElementById('description-list');
         const categoryList = document.getElementById('category-list');
         
+        if (!descriptionList || !categoryList) {
+            console.error('Datalists not found in DOM');
+            return;
+        }
+        
         // Get categories from budget
         const budgetTransaction = db.transaction(['budget'], 'readonly');
         const budgetStore = budgetTransaction.objectStore('budget');
@@ -936,10 +947,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const budgetCategories = budgets.map(b => b.category);
             const uniqueDescriptions = [...new Set(transactions.map(tx => tx.description))];
             const transactionCategories = [...new Set(transactions.map(tx => tx.category))];
-            const allCategories = [...new Set([...budgetCategories, ...transactionCategories])];
+            const allCategories = [...new Set([...budgetCategories, ...transactionCategories])].filter(c => c);
             
             descriptionList.innerHTML = uniqueDescriptions.map(d => `<option value="${d}"></option>`).join('');
             categoryList.innerHTML = allCategories.map(c => `<option value="${c}"></option>`).join('');
+            
+            console.log('Updated datalist with', allCategories.length, 'categories:', allCategories);
         };
     }
 
