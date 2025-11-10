@@ -1,0 +1,299 @@
+╔═══════════════════════════════════════════════════════════════════════╗
+║                    ENHANCED CHECKBOOK PWA - UI LAYOUT                 ║
+╚═══════════════════════════════════════════════════════════════════════╝
+
+MAIN SCREEN VIEW:
+═════════════════════════════════════════════════════════════════════════
+
+┌───────────────────────────────────────────────────────────────────────┐
+│                      Checkbook Register                               │
+├───────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  ┌──────────────── ACCOUNT NAVIGATION ROW ────────────────────┐     │
+│  │  [Accts]  [Bdgt]  [Chking]  [Saving]  [Credit]            │     │
+│  │   gray    gray    PURPLE*    gray      gray                │     │
+│  └─────────────────────────────────────────────────────────────┘     │
+│                     *Active account highlighted                       │
+│                                                                       │
+│  ┌───────────────── ACTION CONTROLS ROW ──────────────────────┐     │
+│  │  [Add]  [Purge]  [Save]  [Load]  [CSV]  [Filter]          │     │
+│  │  purple  purple  purple  purple  purple  purple            │     │
+│  └─────────────────────────────────────────────────────────────┘     │
+│                                                                       │
+├───────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  ╔═══════════════════════════════════════════════════════════╗       │
+│  ║ Actions        │ Description        │ Amount               ║       │
+│  ║ Date           │ Category           │ Balance              ║       │
+│  ╠═══════════════════════════════════════════════════════════╣       │
+│  ║ [✓] [X]        │ Grocery Store      │      -45.67         ║       │
+│  ║ 11/09/25       │ Groceries          │     1,234.56        ║       │
+│  ╟───────────────────────────────────────────────────────────╢       │
+│  ║ [ ] [X]        │ Gas Station        │      -35.00         ║       │
+│  ║ 11/08/25       │ Gas                │     1,280.23        ║       │
+│  ╟───────────────────────────────────────────────────────────╢       │
+│  ║ [✓] [X]        │ Paycheck           │    +2,000.00        ║       │
+│  ║ 11/07/25       │ Income             │     1,315.23        ║       │
+│  ╟───────────────────────────────────────────────────────────╢       │
+│  ║      ...more transactions...                              ║       │
+│  ╚═══════════════════════════════════════════════════════════╝       │
+│         [✓] = Reconciled checkbox     [X] = Delete button            │
+│         Red numbers = Negative balance                                │
+└───────────────────────────────────────────────────────────────────────┘
+
+
+ACCOUNTS MODAL (Click "Accts"):
+═════════════════════════════════════════════════════════════════════════
+
+┌───────────────────────────────────────────────────────────────────────┐
+│  [×]                   Manage Accounts                                │
+├───────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  Add New Account                                                      │
+│  ┌──────────────────────────────────────────────────────────────┐    │
+│  │ Account Name: [Wells Fargo Checking________________]         │    │
+│  │ Button Label: [WF Chk___________]  (max 10 chars)           │    │
+│  │                                                               │    │
+│  │                    [ Add Account ]                           │    │
+│  └──────────────────────────────────────────────────────────────┘    │
+│                                                                       │
+│  ─────────────────────────────────────────────────────────────────   │
+│                                                                       │
+│  Existing Accounts                                                    │
+│  ┌──────────────────────────────────────────────────────────────┐    │
+│  │  Checking Account (Chking)                          [X]      │    │
+│  ├──────────────────────────────────────────────────────────────┤    │
+│  │  Savings Account (Saving)                           [X]      │    │
+│  ├──────────────────────────────────────────────────────────────┤    │
+│  │  Credit Card (Credit)                               [X]      │    │
+│  └──────────────────────────────────────────────────────────────┘    │
+│                                                                       │
+└───────────────────────────────────────────────────────────────────────┘
+
+
+BUDGET MODAL (Click "Bdgt"):
+═════════════════════════════════════════════════════════════════════════
+
+┌───────────────────────────────────────────────────────────────────────┐
+│  [×]                   Monthly Budget                                 │
+├───────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  Add Budget Category                                                  │
+│  ┌──────────────────────────────────────────────────────────────┐    │
+│  │ Category Name: [Entertainment_________________]              │    │
+│  │ Monthly Amount: [100.00________]                             │    │
+│  │                                                               │    │
+│  │                    [ Add Budget ]                            │    │
+│  └──────────────────────────────────────────────────────────────┘    │
+│                                                                       │
+│  ─────────────────────────────────────────────────────────────────   │
+│                                                                       │
+│  Current Month Budget                                                 │
+│  ┌──────────────────────────────────────────────────────────────┐    │
+│  │ Category    │ $ Allowed │ $ Spent  │ $ Remaining │         │    │
+│  ├──────────────────────────────────────────────────────────────┤    │
+│  │ Groceries   │   $400.00 │  $385.42 │     $14.58  │   [X]   │    │
+│  ├──────────────────────────────────────────────────────────────┤    │
+│  │ Gas         │   $150.00 │  $125.00 │     $25.00  │   [X]   │    │
+│  ├──────────────────────────────────────────────────────────────┤    │
+│  │ Utilities   │   $200.00 │  $225.67 │    -$25.67  │   [X]   │    │
+│  │             │           │          │   (RED!)               │    │
+│  ├──────────────────────────────────────────────────────────────┤    │
+│  │ Eating Out  │   $100.00 │   $45.32 │     $54.68  │   [X]   │    │
+│  └──────────────────────────────────────────────────────────────┘    │
+│                                                                       │
+└───────────────────────────────────────────────────────────────────────┘
+
+
+CSV MODAL (Click "CSV"):
+═════════════════════════════════════════════════════════════════════════
+
+┌───────────────────────────────────────────────────────────────────────┐
+│  [×]                  CSV Import/Export                               │
+├───────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  Import CSV                                                           │
+│  Import transactions from your bank's CSV export.                     │
+│                                                                       │
+│  ┌──────────────────────────────────────────────────────────────┐    │
+│  │ (•) Auto Reconciliation                                      │    │
+│  │     Match and reconcile existing transactions, add new ones  │    │
+│  │                                                               │    │
+│  │ ( ) Sync Mode                                                │    │
+│  │     Only add missing transactions (skip duplicates)          │    │
+│  └──────────────────────────────────────────────────────────────┘    │
+│                                                                       │
+│  Matching uses date (±1 day) and amount (±$1)                        │
+│                                                                       │
+│                   [ Import CSV File ]                                 │
+│                                                                       │
+│  ─────────────────────────────────────────────────────────────────   │
+│                                                                       │
+│  Export CSV                                                           │
+│  Export current account transactions to CSV file.                     │
+│                                                                       │
+│                   [ Export to CSV ]                                   │
+│                                                                       │
+└───────────────────────────────────────────────────────────────────────┘
+
+
+ADD TRANSACTION MODAL (Click "Add"):
+═════════════════════════════════════════════════════════════════════════
+
+┌───────────────────────────────────────────────────────────────────────┐
+│  [×]                  New Transaction                                 │
+├───────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  Date: [11/10/2025___]                                               │
+│                                                                       │
+│  Description: [Walmart_______________________]                       │
+│               (autocomplete from history)                             │
+│                                                                       │
+│  Category: [Groceries▼___________________]                           │
+│            (autocomplete from budget)                                 │
+│                                                                       │
+│  ┌──────────────────────────────┬───────────────────────────┐        │
+│  │ [Withdrawal / Debit ▼]       │  Amount: [45.67________]  │        │
+│  └──────────────────────────────┴───────────────────────────┘        │
+│                                                                       │
+│                   [ Save Transaction ]                                │
+│                                                                       │
+└───────────────────────────────────────────────────────────────────────┘
+
+
+IMPORT PREVIEW MODAL (After CSV import):
+═════════════════════════════════════════════════════════════════════════
+
+┌───────────────────────────────────────────────────────────────────────┐
+│  [×]                  Import Preview                                  │
+├───────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  We found 15 new transactions. Does this look correct?                │
+│                                                                       │
+│  ┌──────────────────────────────────────────────────────────────┐    │
+│  │ Date       │ Description              │ Amount               │    │
+│  ├──────────────────────────────────────────────────────────────┤    │
+│  │ 11/09/2025 │ WALMART #1234           │      -45.67          │    │
+│  │ 11/08/2025 │ SHELL GAS STATION       │      -35.00          │    │
+│  │ 11/07/2025 │ PAYCHECK DEPOSIT        │    +2000.00          │    │
+│  │     ...    │        ...              │        ...           │    │
+│  │  (scrollable list)                                          │    │
+│  └──────────────────────────────────────────────────────────────┘    │
+│                                                                       │
+│  [✓] Mark imported transactions as reconciled                        │
+│                                                                       │
+│         [ Confirm Import ]        [ Cancel ]                          │
+│                                                                       │
+└───────────────────────────────────────────────────────────────────────┘
+
+
+COLOR GUIDE:
+═════════════════════════════════════════════════════════════════════════
+
+Background Colors:
+  Lavender (#E6E6FA)    - Main background
+  Darker Lavender       - Table headers, inactive account buttons
+  Light Lavender        - Odd table rows
+  White                 - Even table rows, modals
+
+Button Colors:
+  Purple (#9370DB)      - Primary action buttons, active account
+  Red (#D9534F)         - Delete buttons, negative values
+  Gray                  - Cancel buttons, inactive states
+
+Text Colors:
+  Dark Gray (#333)      - Main text
+  Red                   - Negative balances, over-budget amounts
+  Purple                - Section headers in modals
+
+Visual States:
+  PURPLE + BORDER       - Active account button
+  RED TEXT              - Negative balance or over budget
+  CHECKMARK (✓)         - Transaction is reconciled
+  RED X BUTTON          - Delete action
+
+
+RESPONSIVE BEHAVIOR:
+═════════════════════════════════════════════════════════════════════════
+
+Desktop (>600px):
+  • Full button labels visible
+  • Table columns spacious
+  • Modals centered
+
+Mobile (<600px):
+  • Buttons remain readable (min-width enforced)
+  • Account buttons wrap to multiple rows if needed
+  • Table scrolls horizontally if needed
+  • Touch-friendly tap targets (22px minimum)
+  • Modals fill 90% of screen width
+
+
+WORKFLOW DIAGRAMS:
+═════════════════════════════════════════════════════════════════════════
+
+Daily Transaction Entry:
+  1. Check active account button (purple highlight)
+  2. Click [Add]
+  3. Fill form (category auto-suggests from budget)
+  4. Click [Save Transaction]
+  5. Balance updates automatically
+
+Monthly Reconciliation:
+  1. Download bank CSV
+  2. Click [CSV]
+  3. Select "Auto Reconciliation" mode
+  4. Click [Import CSV File]
+  5. Choose downloaded file
+  6. Review preview (15 new found)
+  7. Check "Mark as reconciled" if desired
+  8. Click [Confirm Import]
+  9. Transactions matched and added
+
+Budget Check:
+  1. Click [Bdgt]
+  2. Review spending by category
+  3. Note any red amounts (over budget)
+  4. Close modal
+  5. Adjust spending as needed
+
+Account Switching:
+  1. Click desired account button (top row)
+  2. Button turns purple
+  3. Transactions update to show that account
+  4. Add/edit/view transactions for that account
+
+
+KEY INTERACTION PATTERNS:
+═════════════════════════════════════════════════════════════════════════
+
+✓ All modals close via:
+  - [×] button (top right)
+  - Click outside modal
+  - Cancel/close buttons
+
+✓ All destructive actions require confirmation:
+  - Delete transaction
+  - Delete account  
+  - Delete budget category
+  - Purge transactions
+  - Import over existing data
+
+✓ Visual feedback immediate:
+  - Button highlights when clicked
+  - Active account always visible
+  - Balance recalculates instantly
+  - Budget updates in real-time
+
+✓ Error prevention:
+  - Required fields enforced
+  - Duplicate imports blocked
+  - Default account protected
+  - Fuzzy matching tolerant
+
+
+╔═══════════════════════════════════════════════════════════════════════╗
+║  This layout preserves simplicity while adding powerful features!     ║
+║  Two-row navigation keeps cognitive load low.                         ║
+║  Active states are always visually obvious.                           ║
+╚═══════════════════════════════════════════════════════════════════════╝

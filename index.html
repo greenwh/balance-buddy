@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Balance Buddy</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="theme-color" content="#E6E6FA"/>
+</head>
+<body>
+    <header>
+        <h1>Balance Buddy</h1>
+        <!-- Account Navigation Row -->
+        <div class="account-nav">
+            <button id="accountsBtn">Accts</button>
+            <button id="budgetBtn">Bdgt</button>
+            <div id="accountButtons"></div>
+        </div>
+        <!-- Action Controls Row -->
+        <div class="controls">
+            <button id="addTransactionBtn">Add</button>
+            <button id="purgeBtn">Purge</button>
+            <button id="exportBtn">Save</button>
+            <input type="file" id="importFile" accept=".json" style="display: none;">
+            <button id="importBtn">Load</button>
+            <button id="csvBtn">CSV</button>
+            <button id="filterBtn">Filter</button>
+        </div>
+    </header>
+
+    <main>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Actions<br><small>Date</small></th>
+                        <th>Description<br><small>Category</small></th>
+                        <th>Amount<br><small>Balance</small></th>
+                    </tr>
+                </thead>
+                <tbody id="transaction-list">
+                    <!-- Transactions will be dynamically inserted here -->
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <!-- Add Transaction Modal -->
+    <div id="addTransactionModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>New Transaction</h2>
+            <form id="addTransactionForm">
+                <input type="date" id="transactionDate" required>
+                <input type="text" id="transactionDescription" placeholder="Description" list="description-list" required>
+                <datalist id="description-list"></datalist>
+                <input type="text" id="transactionCategory" placeholder="Category" list="category-list" required>
+                <datalist id="category-list"></datalist>
+                <div class="amount-group">
+                    <select id="transactionType" required>
+                        <option value="debit">Withdrawal / Debit</option>
+                        <option value="deposit">Deposit</option>
+                    </select>
+                    <input type="number" id="transactionAmount" placeholder="Amount" step="0.01" min="0" required>
+                </div>
+                <button type="submit">Save Transaction</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Purge Transactions Modal -->
+    <div id="purgeModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Purge Reconciled Transactions</h2>
+            <p>Select a date. All reconciled transactions on or before this date will be permanently deleted.</p>
+            <form id="purgeForm">
+                <input type="date" id="purgeDate" required>
+                <div class="modal-buttons">
+                    <button type="submit" class="confirm-btn">Confirm Purge</button>
+                    <button type="button" class="cancel-btn">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- CSV Import/Export Modal -->
+    <div id="csvModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>CSV Import/Export</h2>
+            
+            <div class="csv-section">
+                <h3>Import CSV</h3>
+                <p>Import transactions from your bank's CSV export.</p>
+                
+                <div class="csv-mode-selection">
+                    <label>
+                        <input type="radio" name="csvMode" value="reconcile" checked>
+                        <strong>Auto Reconciliation</strong> - Match and reconcile existing transactions, add new ones
+                    </label>
+                    <label>
+                        <input type="radio" name="csvMode" value="sync">
+                        <strong>Sync Mode</strong> - Only add missing transactions (skip duplicates)
+                    </label>
+                </div>
+                
+                <p><small>Matching uses date (±1 day) and amount (±$1)</small></p>
+                
+                <input type="file" id="csvImportFile" accept=".csv, .txt" style="display: none;">
+                <button id="csvImportBtn" class="csv-action-btn">Import CSV File</button>
+            </div>
+            
+            <hr style="margin: 20px 0;">
+            
+            <div class="csv-section">
+                <h3>Export CSV</h3>
+                <p>Export current account transactions to CSV file.</p>
+                <button id="csvExportBtn" class="csv-action-btn">Export to CSV</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CSV Import Preview Modal -->
+    <div id="importPreviewModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Import Preview</h2>
+            <p>We found <strong id="import-count">0</strong> new transactions. Does this look correct?</p>
+            <div class="table-container" style="max-height: 300px; overflow-y: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Description</th>
+                            <th>Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody id="import-preview-list"></tbody>
+                </table>
+            </div>
+            
+            <div class="import-options">
+                <input type="checkbox" id="markAsReconciled">
+                <label for="markAsReconciled">Mark imported transactions as reconciled</label>
+            </div>
+
+            <div class="modal-buttons">
+                <button id="confirmImportBtn" class="confirm-btn">Confirm Import</button>
+                <button id="cancelImportBtn" class="cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Modal -->
+    <div id="filterModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Filter & Sort Transactions</h2>
+            <div class="filter-section">
+                <input type="date" id="startDateFilter" placeholder="Start Date">
+                <input type="date" id="endDateFilter" placeholder="End Date">
+                <input type="text" id="descriptionFilter" placeholder="Description...">
+                <input type="text" id="categoryFilter" placeholder="Category...">
+                <select id="reconciledFilter">
+                    <option value="all">All Statuses</option>
+                    <option value="true">Reconciled</option>
+                    <option value="false">Unreconciled</option>
+                </select>
+                <select id="sortOrder">
+                    <option value="asc">Oldest First</option>
+                    <option value="desc">Newest First</option>
+                </select>
+                <button id="applyFilterBtn">Apply Filters</button>
+                <button id="clearFilterBtn">Clear Filters</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Accounts Management Modal -->
+    <div id="accountsModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Manage Accounts</h2>
+            
+            <div class="accounts-section">
+                <h3>Add New Account</h3>
+                <div class="account-form">
+                    <input type="text" id="newAccountName" placeholder="Account Name (e.g., Wells Fargo Checking)">
+                    <input type="text" id="newAccountLabel" placeholder="Button Label (e.g., WF Chk)" maxlength="10">
+                    <button onclick="addAccount()" class="csv-action-btn">Add Account</button>
+                </div>
+            </div>
+            
+            <hr style="margin: 20px 0;">
+            
+            <div class="accounts-section">
+                <h3>Existing Accounts</h3>
+                <div id="accountsList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Budget Management Modal -->
+    <div id="budgetModal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <span class="close-button">&times;</span>
+            <h2>Monthly Budget</h2>
+            
+            <div class="budget-section">
+                <h3>Add Budget Category</h3>
+                <div class="budget-form">
+                    <input type="text" id="newBudgetCategory" placeholder="Category Name" list="category-list">
+                    <input type="number" id="newBudgetAmount" placeholder="Monthly Amount" step="0.01" min="0">
+                    <button onclick="addBudget()" class="csv-action-btn">Add Budget</button>
+                </div>
+            </div>
+            
+            <hr style="margin: 20px 0;">
+            
+            <div class="budget-section">
+                <h3>Current Month Budget</h3>
+                <div class="table-container">
+                    <table id="budgetList">
+                        <tr>
+                            <th>Category</th>
+                            <th>$ Allowed</th>
+                            <th>$ Spent</th>
+                            <th>$ Remaining</th>
+                            <th></th>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+name (amount signs): Arvest Bank Checking (deposits positive and debits negative)
+Account,Date,Pending?,Description,Category,Check,Credit,Debit 
+Name 1,10/10/2025,,"CAPITAL ONE CARD ONLINE PMT GREE,WILL",Financial Services,,,-4
+Name 1,10/3/2025,,SSA  XXSOC SEC N1*GD*WG\N 1*BE*S G,Uncategorized Income,,1569,
+
+name (amount signs): USAA Credit Card (Payments negative and charges positive)
+Date,Description,Original Description,Category,Amount,Status 
+8/4/2025,Payment,PAYMENT-THANK YOU        SAN ANTONIO  TX,Credit Card Payment,-300,Posted
+8/3/2025,KFC,KFC J625203              DUNCAN       OK,Fast Food,14.34,Posted
+
+name (amount signs): Wells Fargo Card (Payments positive and charges negative)
+Date,Amount,,,Description 
+10/30/2025,12.61,*,,AMAZON MKTPLACE PMTS Amzn.com/billWA
+10/27/2025,-7.92,*,,MCDONALD'S F29760 DUNCAN OK
+
+name (amount signs): USAA Checking (deposits positive and debits negative)
+Date,Description,Original Description,Category,Amount,Status
+2025-09-15,"BANK COMMERCE                    091525","BANK COMMERCE                    091525",Category Pending,-100.00,Posted
+2025-09-12,"USAA Transfer","USAA FUNDS TRANSFER CR",Transfer,2100.00,Posted
