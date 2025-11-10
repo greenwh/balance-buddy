@@ -385,7 +385,8 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('newBudgetCategory').value = '';
             document.getElementById('newBudgetAmount').value = '';
             loadBudgetList();
-            updateDatalists();
+            // Refresh datalists with new budget category
+            refreshDatalists();
         };
     };
 
@@ -836,6 +837,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- DATA UTILITIES & SERVICE WORKER ---
+    function refreshDatalists() {
+        // Get current account transactions for descriptions
+        const transactionStore = db.transaction('transactions', 'readonly').objectStore('transactions');
+        const index = transactionStore.index('accountId');
+        const range = IDBKeyRange.only(currentAccountId);
+        const request = index.getAll(range);
+        
+        request.onsuccess = () => {
+            updateDatalists(request.result);
+        };
+    }
+    
     function updateDatalists(transactions) {
         const descriptionList = document.getElementById('description-list');
         const categoryList = document.getElementById('category-list');
