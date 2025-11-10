@@ -408,6 +408,20 @@ button[type="submit"]:hover {
     opacity: 0.9;
 }
 
+/* Inline editing styles */
+.inline-category-edit {
+    cursor: text;
+    transition: all 0.2s ease;
+}
+
+.inline-category-edit:hover {
+    background-color: #F5F5FF !important;
+}
+
+.inline-category-edit:focus {
+    outline: none;
+}
+
 /* Responsive adjustments */
 @media (max-width: 600px) {
     .account-nav {

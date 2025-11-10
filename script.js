@@ -326,6 +326,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
                 budgetList.appendChild(row);
             });
+            
+            // Add helpful tip about unbudgeted transactions
+            const tipRow = document.createElement('tr');
+            tipRow.innerHTML = `
+                <td colspan="5" style="padding-top: 15px; font-size: 0.9em; color: #666;">
+                    💡 <strong>Tip:</strong> You can click any category in your transactions to change it. 
+                    This lets you assign spending to your budget categories.
+                </td>
+            `;
+            budgetList.appendChild(tipRow);
         };
     }
 
@@ -494,7 +504,54 @@ document.addEventListener('DOMContentLoaded', () => {
                 cell1.appendChild(dateDiv);
                 row.appendChild(cell1);
                 const cell2 = document.createElement('td');
-                cell2.innerHTML = `${tx.description}<br><small><em>${tx.category}</em></small>`;
+                const descDiv = document.createElement('div');
+                descDiv.textContent = tx.description;
+                
+                const categoryContainer = document.createElement('div');
+                categoryContainer.style.marginTop = '4px';
+                
+                const categoryInput = document.createElement('input');
+                categoryInput.type = 'text';
+                categoryInput.value = tx.category;
+                categoryInput.list = 'category-list';
+                categoryInput.className = 'inline-category-edit';
+                categoryInput.style.fontSize = '0.85em';
+                categoryInput.style.fontStyle = 'italic';
+                categoryInput.style.border = '1px solid transparent';
+                categoryInput.style.background = 'transparent';
+                categoryInput.style.padding = '2px 4px';
+                categoryInput.style.width = '100%';
+                categoryInput.style.boxSizing = 'border-box';
+                
+                // Highlight on focus
+                categoryInput.onfocus = function() {
+                    this.style.border = '1px solid #9370DB';
+                    this.style.background = '#F5F5FF';
+                };
+                
+                // Save on blur or enter
+                const saveCategory = function() {
+                    categoryInput.style.border = '1px solid transparent';
+                    categoryInput.style.background = 'transparent';
+                    const newCategory = categoryInput.value.trim();
+                    if (newCategory && newCategory !== tx.category) {
+                        updateTransactionCategory(tx.id, newCategory);
+                    }
+                };
+                
+                categoryInput.onblur = saveCategory;
+                categoryInput.onkeydown = function(e) {
+                    if (e.key === 'Enter') {
+                        this.blur();
+                    } else if (e.key === 'Escape') {
+                        categoryInput.value = tx.category;
+                        this.blur();
+                    }
+                };
+                
+                categoryContainer.appendChild(categoryInput);
+                cell2.appendChild(descDiv);
+                cell2.appendChild(categoryContainer);
                 row.appendChild(cell2);
                 const cell3 = document.createElement('td');
                 const runningBalance = balanceMap.get(tx.id);
@@ -525,6 +582,22 @@ document.addEventListener('DOMContentLoaded', () => {
             if (budgetModal.style.display === 'block') {
                 calculateBudgetSpending();
             }
+        };
+    }
+
+    function updateTransactionCategory(id, newCategory) {
+        const transactionStore = db.transaction('transactions', 'readwrite').objectStore('transactions');
+        const request = transactionStore.get(id);
+        request.onsuccess = () => {
+            const transaction = request.result;
+            transaction.category = newCategory;
+            const updateRequest = transactionStore.put(transaction);
+            updateRequest.onsuccess = () => {
+                backupToLocalStorage();
+                if (budgetModal.style.display === 'block') {
+                    calculateBudgetSpending();
+                }
+            };
         };
     }
 
