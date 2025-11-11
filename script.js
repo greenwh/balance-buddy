@@ -437,9 +437,7 @@ document.addEventListener('DOMContentLoaded', () => {
             addModal.style.display = 'none';
             applyFilters();
             backupToLocalStorage();
-            if (budgetModal.style.display === 'block') {
-                calculateBudgetSpending();
-            }
+            calculateBudgetSpending();
         };
         request.onerror = (err) => console.error('Error adding transaction:', err);
     }
@@ -585,9 +583,7 @@ document.addEventListener('DOMContentLoaded', () => {
         request.onsuccess = () => {
             applyFilters();
             backupToLocalStorage();
-            if (budgetModal.style.display === 'block') {
-                calculateBudgetSpending();
-            }
+            calculateBudgetSpending();
         };
     }
 
@@ -600,9 +596,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const updateRequest = transactionStore.put(transaction);
             updateRequest.onsuccess = () => {
                 backupToLocalStorage();
-                if (budgetModal.style.display === 'block') {
-                    calculateBudgetSpending();
-                }
+                calculateBudgetSpending();
             };
         };
     }
@@ -879,9 +873,7 @@ document.addEventListener('DOMContentLoaded', () => {
             alert(`${transactionsToSave.length} transactions imported successfully!`);
             applyFilters();
             backupToLocalStorage();
-            if (budgetModal.style.display === 'block') {
-                calculateBudgetSpending();
-            }
+            calculateBudgetSpending();
         };
         transaction.onerror = (err) => {
             console.error("Error saving imported transactions:", err);
