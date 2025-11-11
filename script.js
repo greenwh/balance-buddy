@@ -2,7 +2,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- DATABASE SETUP ---
     let db;
     let currentAccountId = localStorage.getItem('currentAccountId') || 'default';
-    const request = indexedDB.open('checkbookDB', 2);
+    let currentBudgetMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+    const request = indexedDB.open('checkbookDB', 3);
 
     request.onerror = event => console.error('Database error:', event.target.errorCode);
     request.onupgradeneeded = event => {
@@ -37,6 +38,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // Create budget store
         if (!db.objectStoreNames.contains('budget')) {
             db.createObjectStore('budget', { keyPath: 'category' });
+        }
+
+        // Create budgetHistory store for monthly budget tracking
+        if (!db.objectStoreNames.contains('budgetHistory')) {
+            db.createObjectStore('budgetHistory', { keyPath: 'month' });
         }
     };
     
@@ -294,14 +300,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function loadBudgetList() {
-        const transaction = db.transaction(['budget'], 'readonly');
+        const transaction = db.transaction(['budgetHistory', 'budget'], 'readonly');
+        const budgetHistoryStore = transaction.objectStore('budgetHistory');
         const budgetStore = transaction.objectStore('budget');
-        const request = budgetStore.getAll();
-        
+        const request = budgetHistoryStore.get(currentBudgetMonth);
+
         request.onsuccess = () => {
-            const budgets = request.result;
+            let monthlyBudget = request.result;
             const budgetList = document.getElementById('budgetList');
+
+            // Format month for display
+            const [year, month] = currentBudgetMonth.split('-');
+            const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
             budgetList.innerHTML = `
+                <tr>
+                    <th colspan="5" style="text-align: center; background: #f0f0f0; padding: 10px;">
+                        <button onclick="changeBudgetMonth(-1)" style="float: left;">◀ Prev</button>
+                        ${monthName}
+                        <button onclick="changeBudgetMonth(1)" style="float: right;">Next ▶</button>
+                    </th>
+                </tr>
                 <tr>
                     <th>Category</th>
                     <th>$ Allowed</th>
@@ -310,50 +329,76 @@ document.addEventListener('DOMContentLoaded', () => {
                     <th></th>
                 </tr>
             `;
-            
-            budgets.forEach(budget => {
-                const row = document.createElement('tr');
-                const spent = budget.spent || 0;
-                const remaining = budget.amount - spent;
-                const remainingClass = remaining < 0 ? 'negative' : '';
-                
-                row.innerHTML = `
-                    <td>${budget.category}</td>
-                    <td>$${budget.amount.toFixed(2)}</td>
-                    <td>$${spent.toFixed(2)}</td>
-                    <td class="${remainingClass}">$${remaining.toFixed(2)}</td>
-                    <td><button onclick="deleteBudget('${budget.category}')" class="delete-btn">X</button></td>
-                `;
-                budgetList.appendChild(row);
-            });
-            
-            // Add helpful tip about unbudgeted transactions
-            const tipRow = document.createElement('tr');
-            tipRow.innerHTML = `
-                <td colspan="5" style="padding-top: 15px; font-size: 0.9em; color: #666;">
-                    💡 <strong>Tip:</strong> You can click any category in your transactions to change it. 
-                    This lets you assign spending to your budget categories.
-                </td>
-            `;
-            budgetList.appendChild(tipRow);
+
+            if (!monthlyBudget) {
+                // No budget for this month yet, show master template
+                const masterRequest = budgetStore.getAll();
+                masterRequest.onsuccess = () => {
+                    const budgets = masterRequest.result;
+                    displayBudgetRows(budgets, budgetList, true);
+                };
+            } else {
+                displayBudgetRows(monthlyBudget.budgets, budgetList, false);
+            }
         };
     }
 
-    function calculateBudgetSpending() {
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
-        
-        const transaction = db.transaction(['transactions', 'budget'], 'readwrite');
+    function displayBudgetRows(budgets, budgetList, isTemplate) {
+        budgets.forEach(budget => {
+            const row = document.createElement('tr');
+            const spent = budget.spent || 0;
+            const remaining = budget.amount - spent;
+            const remainingClass = remaining < 0 ? 'negative' : '';
+
+            row.innerHTML = `
+                <td>${budget.category}</td>
+                <td><input type="number" value="${budget.amount}" onchange="updateMonthlyBudgetAmount('${budget.category}', this.value)" style="width: 80px;" step="0.01" min="0"></td>
+                <td>$${spent.toFixed(2)}</td>
+                <td class="${remainingClass}">$${remaining.toFixed(2)}</td>
+                <td><button onclick="deleteMonthlyBudgetCategory('${budget.category}')" class="delete-btn">X</button></td>
+            `;
+            budgetList.appendChild(row);
+        });
+
+        if (isTemplate) {
+            const noteRow = document.createElement('tr');
+            noteRow.innerHTML = `
+                <td colspan="5" style="padding: 10px; font-style: italic; color: #999;">
+                    No budget set for this month yet. Showing template. Add a transaction or adjust amounts to create this month's budget.
+                </td>
+            `;
+            budgetList.appendChild(noteRow);
+        }
+
+        // Add helpful tip
+        const tipRow = document.createElement('tr');
+        tipRow.innerHTML = `
+            <td colspan="5" style="padding-top: 15px; font-size: 0.9em; color: #666;">
+                💡 <strong>Tip:</strong> You can click any category in your transactions to change it.
+                Budget amounts can be adjusted per month.
+            </td>
+        `;
+        budgetList.appendChild(tipRow);
+    }
+
+    function calculateBudgetSpending(monthStr = null) {
+        // If no month specified, use the transaction's month or current viewing month
+        const targetMonth = monthStr || currentBudgetMonth;
+        const [year, month] = targetMonth.split('-').map(Number);
+        const startOfMonth = new Date(year, month - 1, 1).toISOString().slice(0, 10);
+        const endOfMonth = new Date(year, month, 0).toISOString().slice(0, 10);
+
+        const transaction = db.transaction(['transactions', 'budget', 'budgetHistory'], 'readwrite');
         const transactionStore = transaction.objectStore('transactions');
         const budgetStore = transaction.objectStore('budget');
-        
+        const budgetHistoryStore = transaction.objectStore('budgetHistory');
+
         const index = transactionStore.index('date');
         const range = IDBKeyRange.bound(startOfMonth, endOfMonth);
         const request = index.openCursor(range);
-        
+
         const spending = {};
-        
+
         request.onsuccess = event => {
             const cursor = event.target.result;
             if (cursor) {
@@ -364,33 +409,131 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 cursor.continue();
             } else {
-                // Update budget with spending
-                const budgetRequest = budgetStore.getAll();
-                budgetRequest.onsuccess = () => {
-                    budgetRequest.result.forEach(budget => {
-                        budget.spent = spending[budget.category] || 0;
-                        budgetStore.put(budget);
-                    });
-                    loadBudgetList();
+                // Get or create monthly budget snapshot
+                const monthlyBudgetRequest = budgetHistoryStore.get(targetMonth);
+                monthlyBudgetRequest.onsuccess = () => {
+                    let monthlyBudget = monthlyBudgetRequest.result;
+
+                    if (!monthlyBudget) {
+                        // Create from master budget template
+                        const masterBudgetRequest = budgetStore.getAll();
+                        masterBudgetRequest.onsuccess = () => {
+                            const budgets = masterBudgetRequest.result.map(b => ({
+                                category: b.category,
+                                amount: b.amount,
+                                spent: spending[b.category] || 0
+                            }));
+                            budgetHistoryStore.put({ month: targetMonth, budgets });
+                            if (targetMonth === currentBudgetMonth) {
+                                loadBudgetList();
+                            }
+                        };
+                    } else {
+                        // Update existing monthly budget with new spending
+                        monthlyBudget.budgets.forEach(budget => {
+                            budget.spent = spending[budget.category] || 0;
+                        });
+                        budgetHistoryStore.put(monthlyBudget);
+                        if (targetMonth === currentBudgetMonth) {
+                            loadBudgetList();
+                        }
+                    }
                 };
             }
         };
     }
 
+    window.changeBudgetMonth = function(direction) {
+        const [year, month] = currentBudgetMonth.split('-').map(Number);
+        const date = new Date(year, month - 1 + direction, 1);
+        currentBudgetMonth = date.toISOString().slice(0, 7);
+        loadBudgetList();
+        calculateBudgetSpending();
+    };
+
+    window.updateMonthlyBudgetAmount = function(category, newAmount) {
+        const amount = parseFloat(newAmount);
+        if (isNaN(amount) || amount < 0) {
+            alert('Please enter a valid amount');
+            loadBudgetList();
+            return;
+        }
+
+        const transaction = db.transaction(['budgetHistory', 'budget'], 'readwrite');
+        const budgetHistoryStore = transaction.objectStore('budgetHistory');
+        const budgetStore = transaction.objectStore('budget');
+
+        const request = budgetHistoryStore.get(currentBudgetMonth);
+        request.onsuccess = () => {
+            let monthlyBudget = request.result;
+
+            if (!monthlyBudget) {
+                // Create new monthly budget from master template
+                const masterRequest = budgetStore.getAll();
+                masterRequest.onsuccess = () => {
+                    const budgets = masterRequest.result.map(b => ({
+                        category: b.category,
+                        amount: b.category === category ? amount : b.amount,
+                        spent: 0
+                    }));
+                    budgetHistoryStore.put({ month: currentBudgetMonth, budgets });
+                    calculateBudgetSpending(currentBudgetMonth);
+                };
+            } else {
+                // Update existing monthly budget
+                const budgetItem = monthlyBudget.budgets.find(b => b.category === category);
+                if (budgetItem) {
+                    budgetItem.amount = amount;
+                    budgetHistoryStore.put(monthlyBudget);
+                    loadBudgetList();
+                }
+            }
+        };
+    };
+
+    window.deleteMonthlyBudgetCategory = function(category) {
+        if (!confirm(`Remove ${category} from this month's budget?`)) return;
+
+        const transaction = db.transaction(['budgetHistory'], 'readwrite');
+        const budgetHistoryStore = transaction.objectStore('budgetHistory');
+
+        const request = budgetHistoryStore.get(currentBudgetMonth);
+        request.onsuccess = () => {
+            const monthlyBudget = request.result;
+            if (monthlyBudget) {
+                monthlyBudget.budgets = monthlyBudget.budgets.filter(b => b.category !== category);
+                budgetHistoryStore.put(monthlyBudget);
+                loadBudgetList();
+            }
+        };
+    };
+
     window.addBudget = function() {
         const category = document.getElementById('newBudgetCategory').value.trim();
         const amount = parseFloat(document.getElementById('newBudgetAmount').value);
-        
+
         if (!category || isNaN(amount) || amount <= 0) {
             alert('Please enter a valid category and amount');
             return;
         }
-        
-        const transaction = db.transaction(['budget'], 'readwrite');
+
+        const transaction = db.transaction(['budget', 'budgetHistory'], 'readwrite');
         const budgetStore = transaction.objectStore('budget');
-        
+        const budgetHistoryStore = transaction.objectStore('budgetHistory');
+
+        // Add to master template
         budgetStore.put({ category, amount, spent: 0 });
-        
+
+        // Also add to current month if it exists
+        const monthRequest = budgetHistoryStore.get(currentBudgetMonth);
+        monthRequest.onsuccess = () => {
+            const monthlyBudget = monthRequest.result;
+            if (monthlyBudget) {
+                monthlyBudget.budgets.push({ category, amount, spent: 0 });
+                budgetHistoryStore.put(monthlyBudget);
+            }
+        };
+
         transaction.oncomplete = () => {
             document.getElementById('newBudgetCategory').value = '';
             document.getElementById('newBudgetAmount').value = '';
@@ -433,11 +576,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const objectStore = transaction.objectStore('transactions');
         const request = objectStore.add(newTransaction);
         request.onsuccess = () => {
+            const transactionMonth = newTransaction.date.slice(0, 7); // YYYY-MM
             addTransactionForm.reset();
             addModal.style.display = 'none';
             applyFilters();
             backupToLocalStorage();
-            calculateBudgetSpending();
+            calculateBudgetSpending(transactionMonth);
         };
         request.onerror = (err) => console.error('Error adding transaction:', err);
     }
@@ -579,11 +723,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!confirm('Are you sure you want to delete this transaction?')) return;
         const transaction = db.transaction(['transactions'], 'readwrite');
         const objectStore = transaction.objectStore('transactions');
-        const request = objectStore.delete(id);
-        request.onsuccess = () => {
-            applyFilters();
-            backupToLocalStorage();
-            calculateBudgetSpending();
+
+        // Get transaction first to determine its month
+        const getRequest = objectStore.get(id);
+        getRequest.onsuccess = () => {
+            const tx = getRequest.result;
+            const transactionMonth = tx ? tx.date.slice(0, 7) : null;
+
+            const deleteRequest = objectStore.delete(id);
+            deleteRequest.onsuccess = () => {
+                applyFilters();
+                backupToLocalStorage();
+                if (transactionMonth) {
+                    calculateBudgetSpending(transactionMonth);
+                }
+            };
         };
     }
 
@@ -592,11 +746,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const request = transactionStore.get(id);
         request.onsuccess = () => {
             const transaction = request.result;
+            const transactionMonth = transaction.date.slice(0, 7); // YYYY-MM
             transaction.category = newCategory;
             const updateRequest = transactionStore.put(transaction);
             updateRequest.onsuccess = () => {
                 backupToLocalStorage();
-                calculateBudgetSpending();
+                calculateBudgetSpending(transactionMonth);
             };
         };
     }
@@ -862,6 +1017,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function saveImportedTransactions(transactionsToSave, markAsReconciled) {
+        // Collect unique months from imported transactions
+        const affectedMonths = [...new Set(transactionsToSave.map(tx => tx.date.slice(0, 7)))];
+
         const transaction = db.transaction(['transactions'], 'readwrite');
         const objectStore = transaction.objectStore('transactions');
         transactionsToSave.forEach(tx => {
@@ -873,7 +1031,8 @@ document.addEventListener('DOMContentLoaded', () => {
             alert(`${transactionsToSave.length} transactions imported successfully!`);
             applyFilters();
             backupToLocalStorage();
-            calculateBudgetSpending();
+            // Recalculate budgets for all affected months
+            affectedMonths.forEach(month => calculateBudgetSpending(month));
         };
         transaction.onerror = (err) => {
             console.error("Error saving imported transactions:", err);
@@ -984,21 +1143,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function exportToJson() {
-        const accountTransaction = db.transaction(['accounts', 'transactions', 'budget'], 'readonly');
+        const accountTransaction = db.transaction(['accounts', 'transactions', 'budget', 'budgetHistory'], 'readonly');
         const accountStore = accountTransaction.objectStore('accounts');
         const transactionStore = accountTransaction.objectStore('transactions');
         const budgetStore = accountTransaction.objectStore('budget');
-        
+        const budgetHistoryStore = accountTransaction.objectStore('budgetHistory');
+
         const accountsRequest = accountStore.getAll();
         const transactionsRequest = transactionStore.getAll();
         const budgetRequest = budgetStore.getAll();
-        
+        const budgetHistoryRequest = budgetHistoryStore.getAll();
+
         Promise.all([
             new Promise(resolve => { accountsRequest.onsuccess = () => resolve(accountsRequest.result); }),
             new Promise(resolve => { transactionsRequest.onsuccess = () => resolve(transactionsRequest.result); }),
-            new Promise(resolve => { budgetRequest.onsuccess = () => resolve(budgetRequest.result); })
-        ]).then(([accounts, transactions, budget]) => {
-            const data = JSON.stringify({ accounts, transactions, budget }, null, 2);
+            new Promise(resolve => { budgetRequest.onsuccess = () => resolve(budgetRequest.result); }),
+            new Promise(resolve => { budgetHistoryRequest.onsuccess = () => resolve(budgetHistoryRequest.result); })
+        ]).then(([accounts, transactions, budget, budgetHistory]) => {
+            const data = JSON.stringify({ accounts, transactions, budget, budgetHistory }, null, 2);
             const blob = new Blob([data], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -1017,19 +1179,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (confirm('This will overwrite all current data. Are you sure you want to import this file?')) {
                     try {
                         const data = JSON.parse(e.target.result);
-                        const transaction = db.transaction(['accounts', 'transactions', 'budget'], 'readwrite');
+                        const transaction = db.transaction(['accounts', 'transactions', 'budget', 'budgetHistory'], 'readwrite');
                         const accountStore = transaction.objectStore('accounts');
                         const transactionStore = transaction.objectStore('transactions');
                         const budgetStore = transaction.objectStore('budget');
-                        
+                        const budgetHistoryStore = transaction.objectStore('budgetHistory');
+
                         accountStore.clear();
                         transactionStore.clear();
                         budgetStore.clear();
-                        
+                        budgetHistoryStore.clear();
+
                         if (data.accounts) data.accounts.forEach(a => accountStore.put(a));
                         if (data.transactions) data.transactions.forEach(t => transactionStore.put(t));
                         if (data.budget) data.budget.forEach(b => budgetStore.put(b));
-                        
+                        if (data.budgetHistory) data.budgetHistory.forEach(bh => budgetHistoryStore.put(bh));
+
                         transaction.oncomplete = () => {
                             loadAccounts();
                             applyFilters();
