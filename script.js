@@ -596,13 +596,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const request = transactionStore.get(id);
         request.onsuccess = () => {
             const transaction = request.result;
+            const oldCategory = transaction.category;
             transaction.category = newCategory;
             const updateRequest = transactionStore.put(transaction);
             updateRequest.onsuccess = () => {
                 backupToLocalStorage();
+                // If budget modal is open, recalculate and refresh it
                 if (budgetModal.style.display === 'block') {
                     calculateBudgetSpending();
                 }
+                // Also refresh the display to show the updated category
+                refreshDatalists();
             };
         };
     }
@@ -1061,4 +1065,4 @@ document.addEventListener('DOMContentLoaded', () => {
                 .catch(err => console.log('ServiceWorker registration failed: ', err));
         });
     }
-}); 
+});
