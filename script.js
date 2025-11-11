@@ -1061,4 +1061,4 @@ document.addEventListener('DOMContentLoaded', () => {
                 .catch(err => console.log('ServiceWorker registration failed: ', err));
         });
     }
-});
+}); 
