@@ -1,5 +1,5 @@
 // MODIFIED: Increment the cache version from v2 to v3
-const CACHE_NAME = 'checkbook-cache-v8';
+const CACHE_NAME = 'checkbook-cache-v9';
 
 const urlsToCache = [
     '/',
