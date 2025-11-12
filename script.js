@@ -1110,12 +1110,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function backupToLocalStorage() {
-        const transaction = db.transaction(['transactions'], 'readonly');
-        const objectStore = transaction.objectStore('transactions');
-        const request = objectStore.getAll();
-        request.onsuccess = () => {
-            localStorage.setItem('checkbookBackup', JSON.stringify(request.result));
-        };
+        const transaction = db.transaction(['accounts', 'transactions'], 'readonly');
+        const accountStore = transaction.objectStore('accounts');
+        const transactionStore = transaction.objectStore('transactions');
+
+        const accountsRequest = accountStore.getAll();
+        const transactionsRequest = transactionStore.getAll();
+
+        Promise.all([
+            new Promise(resolve => { accountsRequest.onsuccess = () => resolve(accountsRequest.result); }),
+            new Promise(resolve => { transactionsRequest.onsuccess = () => resolve(transactionsRequest.result); })
+        ]).then(([accounts, transactions]) => {
+            localStorage.setItem('checkbookBackup', JSON.stringify({ accounts, transactions }));
+        });
     }
 
     function syncLocalStorageToIndexedDB() {
@@ -1123,17 +1130,37 @@ document.addEventListener('DOMContentLoaded', () => {
             const backup = localStorage.getItem('checkbookBackup');
             if (backup) {
                 try {
-                    const transactions = JSON.parse(backup);
-                    const transactionStore = db.transaction(['transactions'], 'readwrite').objectStore('transactions');
-                    const clearRequest = transactionStore.clear();
-                    clearRequest.onsuccess = () => {
+                    const data = JSON.parse(backup);
+
+                    // Handle both old format (array of transactions) and new format (object with accounts & transactions)
+                    const isOldFormat = Array.isArray(data);
+                    const transactions = isOldFormat ? data : (data.transactions || []);
+                    const accounts = isOldFormat ? [] : (data.accounts || []);
+
+                    const transaction = db.transaction(['accounts', 'transactions'], 'readwrite');
+                    const accountStore = transaction.objectStore('accounts');
+                    const transactionStore = transaction.objectStore('transactions');
+
+                    // Clear existing data
+                    const clearTransactionsRequest = transactionStore.clear();
+
+                    clearTransactionsRequest.onsuccess = () => {
+                        // Restore transactions
                         transactions.forEach(t => {
                             if (!t.accountId) t.accountId = 'default';
                             transactionStore.put(t);
                         });
+
+                        // Restore accounts if available (only in new format)
+                        if (accounts.length > 0) {
+                            const clearAccountsRequest = accountStore.clear();
+                            clearAccountsRequest.onsuccess = () => {
+                                accounts.forEach(a => accountStore.put(a));
+                            };
+                        }
                         resolve();
                     };
-                    clearRequest.onerror = () => resolve();
+                    clearTransactionsRequest.onerror = () => resolve();
                 } catch (e) {
                     console.error("Error parsing or syncing from localStorage", e);
                     resolve();
@@ -1198,9 +1225,36 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (data.budgetHistory) data.budgetHistory.forEach(bh => budgetHistoryStore.put(bh));
 
                         transaction.oncomplete = () => {
-                            loadAccounts();
-                            applyFilters();
-                            backupToLocalStorage();
+                            // Validate that currentAccountId exists in restored accounts
+                            const checkTransaction = db.transaction(['accounts'], 'readonly');
+                            const checkAccountStore = checkTransaction.objectStore('accounts');
+                            const accountCheck = checkAccountStore.get(currentAccountId);
+
+                            accountCheck.onsuccess = () => {
+                                if (!accountCheck.result) {
+                                    // Current account doesn't exist in restored data
+                                    const getAllAccounts = checkAccountStore.getAll();
+                                    getAllAccounts.onsuccess = () => {
+                                        const accounts = getAllAccounts.result;
+                                        if (accounts.length > 0) {
+                                            // Prefer 'default' account, or use first available
+                                            const defaultAccount = accounts.find(a => a.id === 'default');
+                                            currentAccountId = defaultAccount ? 'default' : accounts[0].id;
+                                        } else {
+                                            currentAccountId = 'default';
+                                        }
+                                        localStorage.setItem('currentAccountId', currentAccountId);
+                                        loadAccounts();
+                                        applyFilters();
+                                        backupToLocalStorage();
+                                    };
+                                } else {
+                                    // Current account exists, proceed normally
+                                    loadAccounts();
+                                    applyFilters();
+                                    backupToLocalStorage();
+                                }
+                            };
                         };
                     } catch (error) {
                         alert('Error parsing JSON file. Please ensure it is a valid export.');
