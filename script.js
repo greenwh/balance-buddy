@@ -883,7 +883,7 @@ document.addEventListener('DOMContentLoaded', () => {
             name: 'Wells Fargo Card',
             header_signature: 'Date,Amount,,,Description',
             columns: { date: 0, amount: 1, description: 4 },
-            processAmount: (row) => -parseFloat(row[1]) // Already negative for charges
+            processAmount: (row) => parseFloat(row[1]) 
         },
         {
             name: 'USAA Checking',
