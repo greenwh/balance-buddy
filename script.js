@@ -811,23 +811,83 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function purgeReconciled(purgeDateStr) {
         if (!confirm(`Are you sure you want to permanently delete all RECONCILED transactions on or before ${purgeDateStr}?`)) return;
-        const transactionStore = db.transaction('transactions', 'readwrite').objectStore('transactions');
+
+        const transactionStore = db.transaction('transactions', 'readonly').objectStore('transactions');
         const index = transactionStore.index('accountId');
         const range = IDBKeyRange.only(currentAccountId);
-        const request = index.openCursor(range);
-        
+        const request = index.getAll(range);
+
         request.onsuccess = event => {
-            const cursor = event.target.result;
-            if (cursor) {
-                const transaction = cursor.value;
-                if (transaction.reconciled && transaction.date <= purgeDateStr) {
-                    cursor.delete();
+            const allTransactions = event.target.result;
+
+            // Sort chronologically
+            allTransactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            // Find transactions to purge
+            const txsToPurge = allTransactions.filter(tx =>
+                tx.reconciled && tx.date <= purgeDateStr
+            );
+
+            if (txsToPurge.length === 0) {
+                alert('No reconciled transactions found on or before the selected date.');
+                return;
+            }
+
+            // Calculate running balance up through and including purge date
+            let openingBalance = 0;
+            for (const tx of allTransactions) {
+                if (tx.date <= purgeDateStr) {
+                    openingBalance += tx.amount;
+                } else {
+                    break;
                 }
-                cursor.continue();
-            } else {
+            }
+
+            // Calculate date for opening balance (one day after purge date)
+            const openingBalanceDate = new Date(purgeDateStr);
+            openingBalanceDate.setDate(openingBalanceDate.getDate() + 1);
+            const openingBalanceDateStr = openingBalanceDate.toISOString().slice(0, 10);
+
+            // Perform the purge with opening balance
+            const writeTransaction = db.transaction(['transactions'], 'readwrite');
+            const writeStore = writeTransaction.objectStore('transactions');
+
+            // Add opening balance transaction (only if non-zero)
+            if (openingBalance !== 0) {
+                const openingBalanceTx = {
+                    date: openingBalanceDateStr,
+                    description: 'Opening Balance',
+                    category: 'Opening Balance',
+                    amount: openingBalance,
+                    reconciled: true,
+                    accountId: currentAccountId
+                };
+                writeStore.add(openingBalanceTx);
+            }
+
+            // Delete old reconciled transactions
+            txsToPurge.forEach(tx => {
+                writeStore.delete(tx.id);
+            });
+
+            writeTransaction.oncomplete = () => {
+                const message = openingBalance !== 0
+                    ? `Purged ${txsToPurge.length} reconciled transactions. Opening balance of $${openingBalance.toFixed(2)} created.`
+                    : `Purged ${txsToPurge.length} reconciled transactions.`;
+                alert(message);
                 applyFilters();
                 backupToLocalStorage();
-            }
+            };
+
+            writeTransaction.onerror = (err) => {
+                console.error('Error during purge:', err);
+                alert('An error occurred during purge. Please try again.');
+            };
+        };
+
+        request.onerror = (err) => {
+            console.error('Error reading transactions for purge:', err);
+            alert('An error occurred while preparing to purge. Please try again.');
         };
     }
 
