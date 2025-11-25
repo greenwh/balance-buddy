@@ -97,7 +97,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- EVENT LISTENERS ---
     addTransactionBtn.onclick = () => addModal.style.display = 'block';
     addModalCloseBtn.onclick = () => addModal.style.display = 'none';
-    purgeBtn.onclick = () => purgeModal.style.display = 'block';
+    purgeBtn.onclick = () => {
+        // Set max date to last day of previous month
+        const today = new Date();
+        const lastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+        const maxDate = lastMonth.toISOString().slice(0, 10);
+        document.getElementById('purgeDate').max = maxDate;
+        purgeModal.style.display = 'block';
+    };
     purgeModalCloseBtn.onclick = () => purgeModal.style.display = 'none';
     cancelPurgeBtn.onclick = () => purgeModal.style.display = 'none';
     filterBtn.onclick = () => filterModal.style.display = 'block';
@@ -295,7 +302,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- BUDGET MANAGEMENT ---
     function showBudgetModal() {
         loadBudgetList();
-        calculateBudgetSpending();
+        // Only recalculate for current month to preserve historical snapshots
+        const today = new Date();
+        const currentMonth = today.toISOString().slice(0, 7);
+        if (currentBudgetMonth === currentMonth) {
+            calculateBudgetSpending();
+        }
         budgetModal.style.display = 'block';
     }
 
@@ -448,7 +460,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const date = new Date(year, month - 1 + direction, 1);
         currentBudgetMonth = date.toISOString().slice(0, 7);
         loadBudgetList();
-        calculateBudgetSpending();
+        // Only recalculate for current month to preserve historical snapshots
+        const today = new Date();
+        const currentMonth = today.toISOString().slice(0, 7);
+        if (currentBudgetMonth === currentMonth) {
+            calculateBudgetSpending();
+        }
     };
 
     window.updateMonthlyBudgetAmount = function(category, newAmount) {
@@ -581,7 +598,12 @@ document.addEventListener('DOMContentLoaded', () => {
             addModal.style.display = 'none';
             applyFilters();
             backupToLocalStorage();
-            calculateBudgetSpending(transactionMonth);
+            // Only recalculate budget for current month
+            const today = new Date();
+            const currentMonth = today.toISOString().slice(0, 7);
+            if (transactionMonth === currentMonth) {
+                calculateBudgetSpending(transactionMonth);
+            }
         };
         request.onerror = (err) => console.error('Error adding transaction:', err);
     }
@@ -734,8 +756,13 @@ document.addEventListener('DOMContentLoaded', () => {
             deleteRequest.onsuccess = () => {
                 applyFilters();
                 backupToLocalStorage();
+                // Only recalculate budget for current month
                 if (transactionMonth) {
-                    calculateBudgetSpending(transactionMonth);
+                    const today = new Date();
+                    const currentMonth = today.toISOString().slice(0, 7);
+                    if (transactionMonth === currentMonth) {
+                        calculateBudgetSpending(transactionMonth);
+                    }
                 }
             };
         };
@@ -751,7 +778,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const updateRequest = transactionStore.put(transaction);
             updateRequest.onsuccess = () => {
                 backupToLocalStorage();
-                calculateBudgetSpending(transactionMonth);
+                // Only recalculate budget for current month
+                const today = new Date();
+                const currentMonth = today.toISOString().slice(0, 7);
+                if (transactionMonth === currentMonth) {
+                    calculateBudgetSpending(transactionMonth);
+                }
                 // Also refresh the display to show the updated category
                 refreshDatalists();
             };
@@ -810,83 +842,179 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function purgeReconciled(purgeDateStr) {
-        if (!confirm(`Are you sure you want to permanently delete all RECONCILED transactions on or before ${purgeDateStr}?`)) return;
+        // Validate purge date is not in current month
+        const today = new Date();
+        const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
 
-        const transactionStore = db.transaction('transactions', 'readonly').objectStore('transactions');
-        const index = transactionStore.index('accountId');
-        const range = IDBKeyRange.only(currentAccountId);
-        const request = index.getAll(range);
+        if (purgeDateStr >= currentMonthStart) {
+            alert('Cannot purge transactions from the current month. This protects budget tracking accuracy.\n\nPlease select a date from last month or earlier.');
+            return;
+        }
 
-        request.onsuccess = event => {
+        if (!confirm(`Are you sure you want to permanently delete all RECONCILED transactions on or before ${purgeDateStr}?\n\nBudget data will be preserved in monthly snapshots.`)) return;
+
+        // Step 1: Get ALL transactions (from all accounts) to identify affected budget months
+        const allTransactionStore = db.transaction('transactions', 'readonly').objectStore('transactions');
+        const allTxRequest = allTransactionStore.getAll();
+
+        allTxRequest.onsuccess = event => {
             const allTransactions = event.target.result;
 
-            // Sort chronologically
-            allTransactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+            // Find all unique PAST months that have transactions being purged (across all accounts)
+            const affectedMonths = new Set();
+            const purgeMonth = purgeDateStr.slice(0, 7); // YYYY-MM of purge date
 
-            // Find transactions to purge
-            const txsToPurge = allTransactions.filter(tx =>
-                tx.reconciled && tx.date <= purgeDateStr
-            );
-
-            if (txsToPurge.length === 0) {
-                alert('No reconciled transactions found on or before the selected date.');
-                return;
-            }
-
-            // Calculate running balance up through and including purge date
-            let openingBalance = 0;
-            for (const tx of allTransactions) {
-                if (tx.date <= purgeDateStr) {
-                    openingBalance += tx.amount;
-                } else {
-                    break;
+            allTransactions.forEach(tx => {
+                if (tx.reconciled && tx.date <= purgeDateStr && tx.amount < 0) { // Only expenses affect budget
+                    const month = tx.date.slice(0, 7); // YYYY-MM
+                    // Only snapshot complete past months (not current month)
+                    if (month < currentMonthStart.slice(0, 7)) {
+                        affectedMonths.add(month);
+                    }
                 }
-            }
-
-            // Calculate date for opening balance (one day after purge date)
-            const openingBalanceDate = new Date(purgeDateStr);
-            openingBalanceDate.setDate(openingBalanceDate.getDate() + 1);
-            const openingBalanceDateStr = openingBalanceDate.toISOString().slice(0, 10);
-
-            // Perform the purge with opening balance
-            const writeTransaction = db.transaction(['transactions'], 'readwrite');
-            const writeStore = writeTransaction.objectStore('transactions');
-
-            // Add opening balance transaction (only if non-zero)
-            if (openingBalance !== 0) {
-                const openingBalanceTx = {
-                    date: openingBalanceDateStr,
-                    description: 'Opening Balance',
-                    category: 'Opening Balance',
-                    amount: openingBalance,
-                    reconciled: true,
-                    accountId: currentAccountId
-                };
-                writeStore.add(openingBalanceTx);
-            }
-
-            // Delete old reconciled transactions
-            txsToPurge.forEach(tx => {
-                writeStore.delete(tx.id);
             });
 
-            writeTransaction.oncomplete = () => {
-                const message = openingBalance !== 0
-                    ? `Purged ${txsToPurge.length} reconciled transactions. Opening balance of $${openingBalance.toFixed(2)} created.`
-                    : `Purged ${txsToPurge.length} reconciled transactions.`;
-                alert(message);
-                applyFilters();
-                backupToLocalStorage();
-            };
+            // Step 2: Snapshot budget data for all affected PAST months
+            const snapshotPromises = Array.from(affectedMonths).map(month => {
+                return new Promise((resolve, reject) => {
+                    // Calculate and save budget snapshot for this month
+                    const [year, monthNum] = month.split('-').map(Number);
+                    const startOfMonth = new Date(year, monthNum - 1, 1).toISOString().slice(0, 10);
+                    const endOfMonth = new Date(year, monthNum, 0).toISOString().slice(0, 10);
 
-            writeTransaction.onerror = (err) => {
-                console.error('Error during purge:', err);
-                alert('An error occurred during purge. Please try again.');
-            };
+                    const transaction = db.transaction(['transactions', 'budget', 'budgetHistory'], 'readwrite');
+                    const transactionStore = transaction.objectStore('transactions');
+                    const budgetStore = transaction.objectStore('budget');
+                    const budgetHistoryStore = transaction.objectStore('budgetHistory');
+
+                    const index = transactionStore.index('date');
+                    const range = IDBKeyRange.bound(startOfMonth, endOfMonth);
+                    const request = index.openCursor(range);
+
+                    const spending = {};
+
+                    request.onsuccess = event => {
+                        const cursor = event.target.result;
+                        if (cursor) {
+                            const tx = cursor.value;
+                            if (tx.amount < 0) { // Only count expenses
+                                const category = tx.category || 'Uncategorized';
+                                spending[category] = (spending[category] || 0) + Math.abs(tx.amount);
+                            }
+                            cursor.continue();
+                        } else {
+                            // Save the snapshot
+                            const masterRequest = budgetStore.getAll();
+                            masterRequest.onsuccess = () => {
+                                const masterBudgets = masterRequest.result;
+                                const budgets = masterBudgets.map(b => ({
+                                    category: b.category,
+                                    amount: b.amount,
+                                    spent: spending[b.category] || 0
+                                }));
+                                budgetHistoryStore.put({ month, budgets });
+                                resolve();
+                            };
+                            masterRequest.onerror = () => reject(masterRequest.error);
+                        }
+                    };
+
+                    request.onerror = () => reject(request.error);
+                });
+            });
+
+            // Step 3: After all snapshots are saved, proceed with purge
+            Promise.all(snapshotPromises)
+                .then(() => {
+                    // Now get transactions for current account only
+                    const transactionStore = db.transaction('transactions', 'readonly').objectStore('transactions');
+                    const index = transactionStore.index('accountId');
+                    const range = IDBKeyRange.only(currentAccountId);
+                    const request = index.getAll(range);
+
+                    request.onsuccess = event => {
+                        const accountTransactions = event.target.result;
+
+                        // Sort chronologically
+                        accountTransactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+                        // Find transactions to purge
+                        const txsToPurge = accountTransactions.filter(tx =>
+                            tx.reconciled && tx.date <= purgeDateStr
+                        );
+
+                        if (txsToPurge.length === 0) {
+                            alert('No reconciled transactions found on or before the selected date.');
+                            return;
+                        }
+
+                        // Calculate running balance up through and including purge date
+                        let openingBalance = 0;
+                        for (const tx of accountTransactions) {
+                            if (tx.date <= purgeDateStr) {
+                                openingBalance += tx.amount;
+                            } else {
+                                break;
+                            }
+                        }
+
+                        // Calculate date for opening balance (one day after purge date)
+                        const openingBalanceDate = new Date(purgeDateStr);
+                        openingBalanceDate.setDate(openingBalanceDate.getDate() + 1);
+                        const openingBalanceDateStr = openingBalanceDate.toISOString().slice(0, 10);
+
+                        // Perform the purge with opening balance
+                        const writeTransaction = db.transaction(['transactions'], 'readwrite');
+                        const writeStore = writeTransaction.objectStore('transactions');
+
+                        // Add opening balance transaction (only if non-zero)
+                        if (openingBalance !== 0) {
+                            const openingBalanceTx = {
+                                date: openingBalanceDateStr,
+                                description: 'Opening Balance',
+                                category: 'Opening Balance',
+                                amount: openingBalance,
+                                reconciled: true,
+                                accountId: currentAccountId
+                            };
+                            writeStore.add(openingBalanceTx);
+                        }
+
+                        // Delete old reconciled transactions
+                        txsToPurge.forEach(tx => {
+                            writeStore.delete(tx.id);
+                        });
+
+                        writeTransaction.oncomplete = () => {
+                            const monthCount = affectedMonths.size;
+                            const budgetMsg = monthCount > 0 ? `\n\nBudget snapshots saved for ${monthCount} month(s).` : '';
+                            const message = openingBalance !== 0
+                                ? `Purged ${txsToPurge.length} reconciled transactions. Opening balance of $${openingBalance.toFixed(2)} created.${budgetMsg}`
+                                : `Purged ${txsToPurge.length} reconciled transactions.${budgetMsg}`;
+                            alert(message);
+                            applyFilters();
+                            backupToLocalStorage();
+                        };
+
+                        writeTransaction.onerror = (err) => {
+                            console.error('Error during purge:', err);
+                            alert('An error occurred during purge. Please try again.');
+                        };
+                    };
+
+                    request.onerror = (err) => {
+                        console.error('Error reading transactions for purge:', err);
+                        alert('An error occurred while preparing to purge. Please try again.');
+                    };
+                })
+                .catch(err => {
+                    console.error('Error creating budget snapshots:', err);
+                    alert('An error occurred while saving budget snapshots. Purge cancelled to protect budget data.');
+                });
         };
 
-        request.onerror = (err) => {
-            console.error('Error reading transactions for purge:', err);
+        allTxRequest.onerror = (err) => {
+            console.error('Error reading transactions for budget snapshot:', err);
             alert('An error occurred while preparing to purge. Please try again.');
         };
     }
@@ -1093,8 +1221,14 @@ document.addEventListener('DOMContentLoaded', () => {
             alert(`${transactionsToSave.length} transactions imported successfully!`);
             applyFilters();
             backupToLocalStorage();
-            // Recalculate budgets for all affected months
-            affectedMonths.forEach(month => calculateBudgetSpending(month));
+            // Only recalculate budget for current month
+            const today = new Date();
+            const currentMonth = today.toISOString().slice(0, 7);
+            affectedMonths.forEach(month => {
+                if (month === currentMonth) {
+                    calculateBudgetSpending(month);
+                }
+            });
         };
         transaction.onerror = (err) => {
             console.error("Error saving imported transactions:", err);
