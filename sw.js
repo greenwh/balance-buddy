@@ -1,5 +1,5 @@
-// MODIFIED: Increment the cache version from v2 to v3
-const CACHE_NAME = 'checkbook-cache-v14';
+// MODIFIED: Increment the cache version for editable amount feature
+const CACHE_NAME = 'checkbook-cache-v15';
 
 const urlsToCache = [
     '/',

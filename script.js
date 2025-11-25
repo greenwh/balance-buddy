@@ -725,11 +725,58 @@ document.addEventListener('DOMContentLoaded', () => {
                 row.appendChild(cell2);
                 const cell3 = document.createElement('td');
                 const runningBalance = balanceMap.get(tx.id);
+
+                // Create editable amount input
+                const amountInput = document.createElement('input');
+                amountInput.type = 'text';
+                amountInput.value = tx.amount.toFixed(2);
+                amountInput.className = 'inline-amount-edit';
+                amountInput.style.fontSize = '1em';
+                amountInput.style.border = '1px solid transparent';
+                amountInput.style.background = 'transparent';
+                amountInput.style.padding = '2px 4px';
+                amountInput.style.width = '80px';
+                amountInput.style.textAlign = 'right';
+                amountInput.style.cursor = 'text';
+                amountInput.placeholder = 'Amount';
+
+                // Highlight on focus
+                amountInput.onfocus = function() {
+                    this.style.border = '1px solid #9370DB';
+                    this.style.background = '#F5F5FF';
+                    this.select(); // Select text for easy replacement
+                };
+
+                // Save on blur or enter
+                const saveAmount = function() {
+                    amountInput.style.border = '1px solid transparent';
+                    amountInput.style.background = 'transparent';
+                    const newAmount = parseFloat(amountInput.value);
+                    if (!isNaN(newAmount) && newAmount !== tx.amount) {
+                        updateTransactionAmount(tx.id, newAmount, tx.amount);
+                    } else if (isNaN(newAmount)) {
+                        amountInput.value = tx.amount.toFixed(2); // Restore if invalid
+                    }
+                };
+
+                amountInput.onblur = saveAmount;
+                amountInput.onkeydown = function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.blur();
+                    } else if (e.key === 'Escape') {
+                        amountInput.value = tx.amount.toFixed(2);
+                        this.blur();
+                    }
+                };
+
+                cell3.appendChild(amountInput);
+                cell3.appendChild(document.createElement('br'));
+
                 const balanceSpan = document.createElement('strong');
                 balanceSpan.className = 'running-balance';
                 balanceSpan.textContent = runningBalance.toFixed(2);
                 if (runningBalance < 0) balanceSpan.classList.add('negative');
-                cell3.innerHTML = `${tx.amount.toFixed(2)}<br>`;
                 cell3.appendChild(balanceSpan);
                 row.appendChild(cell3);
                 transactionList.appendChild(row);
@@ -786,6 +833,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 // Also refresh the display to show the updated category
                 refreshDatalists();
+            };
+        };
+    }
+
+    function updateTransactionAmount(id, newAmount, oldAmount) {
+        const transactionStore = db.transaction('transactions', 'readwrite').objectStore('transactions');
+        const request = transactionStore.get(id);
+        request.onsuccess = () => {
+            const transaction = request.result;
+            const transactionMonth = transaction.date.slice(0, 7); // YYYY-MM
+            transaction.amount = newAmount;
+            const updateRequest = transactionStore.put(transaction);
+            updateRequest.onsuccess = () => {
+                backupToLocalStorage();
+                // Recalculate budget for current month if transaction has a category
+                const today = new Date();
+                const currentMonth = today.toISOString().slice(0, 7);
+                if (transactionMonth === currentMonth) {
+                    calculateBudgetSpending(transactionMonth);
+                }
+                // Refresh display to recalculate running balances
+                applyFilters();
             };
         };
     }

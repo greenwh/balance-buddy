@@ -292,8 +292,9 @@ existingSnapshotRequest.onsuccess = () => {
 ### Transaction Management
 - `addTransaction(e)` - Add new transaction (script.js:577-609)
 - `deleteTransaction(id)` - Delete with budget recalc (script.js:744-769)
-- `updateTransactionCategory(id, category)` - Update category (script.js:771-791)
-- `toggleReconcile(id, state)` - Toggle reconciled flag (script.js:793-805)
+- `updateTransactionCategory(id, category)` - Update category (script.js:818-838)
+- `updateTransactionAmount(id, newAmount, oldAmount)` - Update amount with balance/budget recalc (script.js:840-860)
+- `toggleReconcile(id, state)` - Toggle reconciled flag (script.js:862-874)
 
 ### Purge System
 - `handlePurge(e)` - Purge form handler (script.js:836-842)
@@ -353,6 +354,14 @@ Before deployment:
 - [ ] Test on mobile device
 
 ## Recent Changes
+
+**2024-11-24: Added Inline Editable Transaction Amounts**
+- Feature: Transaction amounts can now be edited directly in the register
+- Use case: Adjusting transactions when tips change the final posted amount
+- Implementation: Click amount to edit, Enter to save, Esc to cancel
+- Location: script.js:729-781 (display), script.js:840-860 (update function)
+- Impact: Running balances and budget spending automatically recalculated when amounts change
+- Service worker: Updated to v15
 
 **2024-11-24: Fixed Multi-Account Purge Bug**
 - Issue: Purging second account would recalculate budget snapshots, losing data from first purged account
