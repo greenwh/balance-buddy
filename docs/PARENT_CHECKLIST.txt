@@ -25,9 +25,10 @@ BEFORE DEPLOYMENT:
   □ Keep ENHANCED_README.md accessible for detailed help
   □ Bookmark or save this location for yourself
 
-□ Service Worker Update
+□ Service Worker Update (If Deploying)
   □ Edit sw.js and change cache version from v5 to v6
   □ This ensures browser gets the new version
+  □ Note: Budget data now properly preserved during multi-account purges
 
 
 INITIAL SETUP WITH YOUR DAUGHTER:
@@ -160,6 +161,11 @@ Solution: Delete it (red X), switch accounts, add it again
 
 Problem: "My budget is all red"
 Solution: Review spending together, adjust budget or behavior
+
+Problem: "Budget shows different amounts for past months"
+Solution: This is normal - budget snapshots preserve historical data
+          Past months won't change even if you purge old transactions
+          This is a feature, not a bug!
 
 Problem: "CSV import didn't work"
 Solution: Check if bank is supported (see csv_formats.txt)

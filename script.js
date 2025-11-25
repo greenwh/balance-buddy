@@ -877,49 +877,65 @@ document.addEventListener('DOMContentLoaded', () => {
             // Step 2: Snapshot budget data for all affected PAST months
             const snapshotPromises = Array.from(affectedMonths).map(month => {
                 return new Promise((resolve, reject) => {
-                    // Calculate and save budget snapshot for this month
-                    const [year, monthNum] = month.split('-').map(Number);
-                    const startOfMonth = new Date(year, monthNum - 1, 1).toISOString().slice(0, 10);
-                    const endOfMonth = new Date(year, monthNum, 0).toISOString().slice(0, 10);
-
                     const transaction = db.transaction(['transactions', 'budget', 'budgetHistory'], 'readwrite');
-                    const transactionStore = transaction.objectStore('transactions');
-                    const budgetStore = transaction.objectStore('budget');
                     const budgetHistoryStore = transaction.objectStore('budgetHistory');
 
-                    const index = transactionStore.index('date');
-                    const range = IDBKeyRange.bound(startOfMonth, endOfMonth);
-                    const request = index.openCursor(range);
-
-                    const spending = {};
-
-                    request.onsuccess = event => {
-                        const cursor = event.target.result;
-                        if (cursor) {
-                            const tx = cursor.value;
-                            if (tx.amount < 0) { // Only count expenses
-                                const category = tx.category || 'Uncategorized';
-                                spending[category] = (spending[category] || 0) + Math.abs(tx.amount);
-                            }
-                            cursor.continue();
-                        } else {
-                            // Save the snapshot
-                            const masterRequest = budgetStore.getAll();
-                            masterRequest.onsuccess = () => {
-                                const masterBudgets = masterRequest.result;
-                                const budgets = masterBudgets.map(b => ({
-                                    category: b.category,
-                                    amount: b.amount,
-                                    spent: spending[b.category] || 0
-                                }));
-                                budgetHistoryStore.put({ month, budgets });
-                                resolve();
-                            };
-                            masterRequest.onerror = () => reject(masterRequest.error);
+                    // Check if snapshot already exists for this month
+                    const existingSnapshotRequest = budgetHistoryStore.get(month);
+                    existingSnapshotRequest.onsuccess = () => {
+                        if (existingSnapshotRequest.result) {
+                            // Snapshot already exists - don't modify it!
+                            // This preserves historical data from previously purged accounts
+                            console.log(`Budget snapshot for ${month} already exists, preserving it.`);
+                            resolve();
+                            return;
                         }
+
+                        // No snapshot exists yet, create one
+                        const [year, monthNum] = month.split('-').map(Number);
+                        const startOfMonth = new Date(year, monthNum - 1, 1).toISOString().slice(0, 10);
+                        const endOfMonth = new Date(year, monthNum, 0).toISOString().slice(0, 10);
+
+                        const transactionStore = transaction.objectStore('transactions');
+                        const budgetStore = transaction.objectStore('budget');
+
+                        const index = transactionStore.index('date');
+                        const range = IDBKeyRange.bound(startOfMonth, endOfMonth);
+                        const request = index.openCursor(range);
+
+                        const spending = {};
+
+                        request.onsuccess = event => {
+                            const cursor = event.target.result;
+                            if (cursor) {
+                                const tx = cursor.value;
+                                if (tx.amount < 0) { // Only count expenses
+                                    const category = tx.category || 'Uncategorized';
+                                    spending[category] = (spending[category] || 0) + Math.abs(tx.amount);
+                                }
+                                cursor.continue();
+                            } else {
+                                // Save the snapshot
+                                const masterRequest = budgetStore.getAll();
+                                masterRequest.onsuccess = () => {
+                                    const masterBudgets = masterRequest.result;
+                                    const budgets = masterBudgets.map(b => ({
+                                        category: b.category,
+                                        amount: b.amount,
+                                        spent: spending[b.category] || 0
+                                    }));
+                                    budgetHistoryStore.put({ month, budgets });
+                                    console.log(`Created new budget snapshot for ${month}`);
+                                    resolve();
+                                };
+                                masterRequest.onerror = () => reject(masterRequest.error);
+                            }
+                        };
+
+                        request.onerror = () => reject(request.error);
                     };
 
-                    request.onerror = () => reject(request.error);
+                    existingSnapshotRequest.onerror = () => reject(existingSnapshotRequest.error);
                 });
             });
 

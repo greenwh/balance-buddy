@@ -2,11 +2,12 @@
 
 ## Changes Made
 
-### Database Schema (IndexedDB v2)
+### Database Schema (IndexedDB v3)
 
 **New Object Stores:**
 - `accounts` (keyPath: 'id') - Stores account definitions
-- `budget` (keyPath: 'category') - Stores monthly budget entries
+- `budget` (keyPath: 'category') - Stores master budget template
+- `budgetHistory` (keyPath: 'month') - Stores monthly budget snapshots with actual spending
 
 **Enhanced Transactions Store:**
 - Added index: `accountId` - Links transactions to accounts
@@ -58,6 +59,15 @@
 - Budget categories auto-populate transaction category dropdown
 - Overspent amounts display in red
 - Recalculates automatically when budget modal is open
+
+**Budget History & Snapshots:**
+- Monthly budget snapshots preserve historical data
+- Created automatically when:
+  - Transactions are added to a new month
+  - Transactions are purged from past months
+- Snapshots are immutable once created (preserves data from purged accounts)
+- Allows viewing past months' budget performance
+- Critical for maintaining accuracy across multi-account purges
 
 #### 3. Enhanced CSV Import/Export
 **Files Modified:** script.js, index.html, style.css
@@ -166,6 +176,35 @@ amountDiff <= $1.00
 - Automatic calculations (balance, budget spending)
 - Same color scheme maintained throughout
 
+### Critical Bug Fix: Multi-Account Purge (November 2024)
+
+**Issue Discovered:**
+When purging transactions from multiple accounts that share the same months, budget snapshots were being recalculated incorrectly, losing historical data from previously purged accounts.
+
+**Root Cause:**
+The purge function would:
+1. Purge Account A → Create snapshot for Oct 2024 (Account A + B data)
+2. Purge Account B → Recalculate snapshot for Oct 2024 (only Account B data, A already gone)
+3. Overwrite good snapshot with incomplete data
+
+**Solution Implemented:**
+Modified `purgeReconciled()` function (script.js:883-891) to check if a budget snapshot already exists before creating/updating:
+```javascript
+const existingSnapshotRequest = budgetHistoryStore.get(month);
+if (existingSnapshotRequest.result) {
+  // Snapshot exists - preserve it!
+  console.log(`Budget snapshot for ${month} already exists, preserving it.`);
+  resolve();
+  return;
+}
+// Only create snapshot if it doesn't exist
+```
+
+**Impact:**
+- Budget snapshots are now immutable historical records
+- Multi-account purging works correctly
+- Historical spending data preserved across all purge operations
+
 ### Testing Checklist
 
 ✅ **Multi-Account:**
@@ -194,6 +233,15 @@ amountDiff <= $1.00
 - Export each account separately
 - Verify CSV format correctness
 - Re-import exported CSV (round-trip test)
+
+✅ **Multi-Account Purge:**
+- Create transactions in multiple accounts for same month
+- Add budget categories and verify spending tracked
+- Purge first account's transactions
+- Verify budget snapshot created and preserved
+- Purge second account's transactions
+- Verify budget snapshot NOT recalculated (historical data intact)
+- Check browser console for "preserving it" message
 
 ✅ **Data Integrity:**
 - JSON export includes all accounts and budget
@@ -295,7 +343,8 @@ amountDiff <= $1.00
 
 ---
 
-**Version:** 2.0
-**Date:** November 2025
-**Database Version:** 2
+**Version:** 3.0
+**Date:** November 2024
+**Database Version:** 3
 **Service Worker Cache:** v5
+**Last Major Update:** Multi-account purge fix (2024-11-24)

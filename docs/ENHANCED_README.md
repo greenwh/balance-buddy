@@ -211,12 +211,21 @@ Match if:
 
 For issues or questions:
 1. Check the original project README
-2. Verify browser compatibility (Chrome 24+, Firefox 16+, Safari 10+)
+2. Verify browser compatibility (Chrome 90+, Firefox 88+, Safari 14+, Edge 90+)
 3. Clear browser cache and reload
 4. Export data before troubleshooting
+5. Check browser console (F12) for error messages
+
+## Recent Updates
+
+**Version 3.0 (November 2024):**
+- Fixed multi-account purge issue with budget snapshots
+- Budget history now properly preserved across multiple account purges
+- Enhanced data integrity for long-term use
 
 ---
 
-**Version:** 2.0 (Enhanced Multi-Account with Budget Tracking)
+**Version:** 3.0 (Enhanced Multi-Account with Budget Tracking)
+**Database Version:** 3
 **Original Project:** Simple Checkbook PWA
-**Enhancements:** Multi-account support, budget tracking, advanced CSV import/export
+**Enhancements:** Multi-account support, budget tracking, advanced CSV import/export, budget history snapshots
