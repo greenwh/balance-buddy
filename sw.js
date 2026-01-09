@@ -1,5 +1,5 @@
-// MODIFIED: Increment the cache version for editable amount feature
-const CACHE_NAME = 'checkbook-cache-v15';
+// MODIFIED: v16 - Fixed newest-first sorting and scroll position on reconcile
+const CACHE_NAME = 'checkbook-cache-v16';
 
 const urlsToCache = [
     '/',

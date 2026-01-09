@@ -1,0 +1,5 @@
+You are in the root of my development environment working on the balance-buddy project.  Balance buddy is mobile first and used almost exclusively on mobile screens. There are 2 issues I'd like to address:
+
+* When filtered to show newest first,  multiple transactions with the same date are still in oldest first entry order within that date and the true balance is not on the top line, it’s on the last entry for that date, causing confusion when the current balance is expected to be at the top.  Latest balance should be at the very top when filtering to show newest first.  Newest first should be a reverse of oldest first where the current balance is the very last transaction 
+
+* During reconciliation the user has to scroll throgh transactions to find transactions matching the account statement from the bank.  When the reconciled transactions box is checked, the page resets to the top causing the user to have to search again.  This is trivial for short lists but becomes a nuisance in longer lists.  Is there a way to keep the page where it is while I'm checking off cleared transactions?

@@ -608,7 +608,7 @@ document.addEventListener('DOMContentLoaded', () => {
         request.onerror = (err) => console.error('Error adding transaction:', err);
     }
 
-    function displayTransactions(filters = null, sortOrder = 'asc') {
+    function displayTransactions(filters = null, sortOrder = 'asc', onComplete = null) {
         const transactionList = document.getElementById('transaction-list');
         transactionList.innerHTML = '';
         const transactionStore = db.transaction('transactions', 'readonly').objectStore('transactions');
@@ -630,7 +630,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 return true;
             }) : allTransactions;
-            filteredTransactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+            // Sort chronologically by date, then by ID for consistent entry order
+            filteredTransactions.sort((a, b) => {
+                const dateCompare = new Date(a.date) - new Date(b.date);
+                if (dateCompare !== 0) return dateCompare;
+                return a.id - b.id; // Secondary sort by ID for same-date transactions
+            });
             const balanceMap = new Map();
             let currentBalance = 0;
             for (const tx of filteredTransactions) {
@@ -638,7 +643,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 balanceMap.set(tx.id, currentBalance);
             }
             if (sortOrder === 'desc') {
-                filteredTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+                // Reverse both date AND entry order so newest balance is at top
+                filteredTransactions.sort((a, b) => {
+                    const dateCompare = new Date(b.date) - new Date(a.date);
+                    if (dateCompare !== 0) return dateCompare;
+                    return b.id - a.id; // Reverse ID order too for true reversal
+                });
             }
             filteredTransactions.forEach(tx => {
                 const row = document.createElement('tr');
@@ -784,6 +794,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!filters) {
                 updateDatalists(allTransactions);
             }
+            // Call completion callback if provided
+            if (onComplete) {
+                requestAnimationFrame(onComplete);
+            }
         };
         request.onerror = (err) => console.error('Error fetching transactions:', err);
     }
@@ -860,6 +874,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function toggleReconcile(id, newReconciledState) {
+        // Save scroll position before re-rendering
+        const scrollY = window.scrollY;
+
         const transactionStore = db.transaction('transactions', 'readwrite').objectStore('transactions');
         const request = transactionStore.get(id);
         request.onsuccess = () => {
@@ -867,14 +884,17 @@ document.addEventListener('DOMContentLoaded', () => {
             transaction.reconciled = newReconciledState;
             const updateRequest = transactionStore.put(transaction);
             updateRequest.onsuccess = () => {
-                applyFilters();
+                // Pass scroll restoration as callback to run after render completes
+                applyFilters(() => {
+                    window.scrollTo(0, scrollY);
+                });
                 backupToLocalStorage();
             };
         };
     }
 
     // --- FILTER, SORT, AND PURGE LOGIC ---
-    function applyFilters() {
+    function applyFilters(onComplete = null) {
         const startDateValue = document.getElementById('startDateFilter').value;
         const endDateValue = document.getElementById('endDateFilter').value;
         const filters = {
@@ -888,7 +908,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('checkbookSortOrder', sortOrder);
         if (filters.startDate) filters.startDate.setUTCHours(0, 0, 0, 0);
         if (filters.endDate) filters.endDate.setUTCHours(23, 59, 59, 999);
-        displayTransactions(filters, sortOrder);
+        displayTransactions(filters, sortOrder, onComplete);
     }
 
     function clearFilters() {
